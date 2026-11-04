@@ -21,15 +21,24 @@ Scene: `Scenes/ClothShowcase.unity`. It has three pieces of cloth, all simulated
 | **1** to **4** | Camera shots: wide, flag, curtain, sheet |
 | **R** | Reset the scene |
 | **H** | Hide the panels (clean recording) |
+| **K** | Show / hide the list of controls |
 | Space / P | Radial impulse under the mouse / pause |
 | Right / middle mouse, wheel, F | Orbit / pan, zoom, reset the camera |
 
 Letters are read by the label printed on the key, so the controls are the same on AZERTY and QWERTY keyboards.
 
-On screen, the left panel lists the controls and the right panel shows live values: solver mode, sub-steps and
-iterations, wind speed, gust and direction (arrow seen from the camera), the flag's maximum stretch with a graph
-of the last 6 seconds (green = Gauss-Seidel, orange = Jacobi), torn edges, split vertices, particles, physics time
-and FPS. The panels are laid out for 1080p and scale with the screen.
+**Settings panel** (right of the screen). Sliders change the simulation while it runs:
+
+| Group | Settings |
+|---|---|
+| Wind | speed, direction, gusts (the arrow shows the direction as seen from the camera) |
+| Cloth | aerodynamic drag k_d and lift k_l, tear limit (how much an edge stretches before it tears) |
+| Solver | sub-steps, iterations, relaxation ω (eq. 13), gravity |
+
+Buttons: Gauss-Seidel / Jacobi, wind on / off, particles / mesh, rip, reset. Below them: the flag's maximum
+stretch with a graph of the last 6 seconds (green = Gauss-Seidel, orange = Jacobi), torn edges, split vertices,
+particles, physics time and FPS. Clicking on the panel never grabs or cuts the cloth behind it. **K** shows the
+list of controls on the left, **H** hides everything. The panels scale with the screen.
 
 ## Cloth model
 

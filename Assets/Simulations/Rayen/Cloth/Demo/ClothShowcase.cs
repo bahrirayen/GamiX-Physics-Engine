@@ -13,9 +13,10 @@ namespace GamiX.Sim.Cloth
     /// Cloth showcase (paper section 8): a textured flag in gusty wind (aerodynamics, tethers), a tartan curtain that
     /// tears when it is pulled or cut (real mesh splitting), and a sheet that falls on obstacles.
     ///
+    /// The settings panel on the right changes the simulation live (wind, aerodynamics, solver, tearing).
     /// Controls: left drag = grab and pull, hold C = cut, T = rip the curtain apart, J = Jacobi / Gauss-Seidel
-    /// distance constraints, W = wind, V = particle view, 1-4 = camera shots, R = reset, H = hide the text,
-    /// Space = impulse, P = pause. Letters are read by their label, so AZERTY and QWERTY keyboards both work.
+    /// distance constraints, W = wind, V = particle view, 1-4 = camera shots, R = reset, H = hide the panels,
+    /// K = list of controls, Space = impulse, P = pause. Letters are read by their label (AZERTY and QWERTY).
     /// </summary>
     public sealed class ClothShowcase : MonoBehaviour
     {
@@ -23,13 +24,19 @@ namespace GamiX.Sim.Cloth
         [Tooltip("Relative strength of the gusts (0 = steady wind).")]
         [Range(0f, 1f)] public float gustiness = 0.45f;
         public bool showText = true;
+        [Tooltip("Show the list of controls (K).")]
+        public bool showControls;
 
         private UnifiedWorld world;
         private ClothAerodynamics aero;
         private ParticleCloth flag, curtain, sheet;
         private ClothCutter cutter;
         private OrbitCamera orbit;
+        private ParticleGrabber grabber;
         private bool windOn = true;
+        private float windSpeed, windAngle;     // settings panel: speed (m/s) and direction (degrees, 0 = +X)
+        private float tearStrength = 1.45f;     // settings panel: tear ratio of the curtain and the sheet
+        private Rect settingsScreenRect;        // settings panel in screen pixels (mouse over it = no grabbing)
         private bool particleView;
         private float smoothMs, smoothFps = 60f, gustPercent, stretchNow;
         private int tornEdges, splitVertices;
@@ -56,10 +63,11 @@ namespace GamiX.Sim.Cloth
 
         private static readonly Shot[] Shots =
         {
-            new Shot { target = new Vector3(0.2f, 1.3f, 0f), distance = 8.5f, yaw = 0f, pitch = 14f },     // 1 wide
-            new Shot { target = new Vector3(-2.6f, 2.3f, 0.2f), distance = 3.6f, yaw = 25f, pitch = 8f },  // 2 flag
-            new Shot { target = new Vector3(0.4f, 1.4f, 0f), distance = 3.8f, yaw = -8f, pitch = 6f },     // 3 curtain
-            new Shot { target = new Vector3(3.3f, 0.7f, 0f), distance = 3.6f, yaw = -30f, pitch = 28f },   // 4 sheet
+            // Targets are shifted right so the scene stays clear of the settings panel on the right of the screen.
+            new Shot { target = new Vector3(2.2f, 1.2f, 0f), distance = 9f, yaw = 0f, pitch = 12f },       // 1 wide
+            new Shot { target = new Vector3(-1.7f, 2.3f, 0.2f), distance = 3.8f, yaw = 25f, pitch = 8f },  // 2 flag
+            new Shot { target = new Vector3(1.2f, 1.4f, 0f), distance = 4.2f, yaw = -8f, pitch = 6f },     // 3 curtain
+            new Shot { target = new Vector3(4.1f, 0.7f, 0f), distance = 3.8f, yaw = -30f, pitch = 28f },   // 4 sheet
         };
         private int shot;
 
@@ -71,6 +79,8 @@ namespace GamiX.Sim.Cloth
             world.parameters.iterations = 4;
             world.parameters.wind = wind;
             world.showStats = false;
+            windSpeed = wind.magnitude;
+            windAngle = Mathf.Atan2(wind.z, wind.x) * Mathf.Rad2Deg;
             aero = world.gameObject.AddComponent<ClothAerodynamics>();
             aero.drag = 1.5f;
             aero.lift = 0.8f;
@@ -130,6 +140,7 @@ namespace GamiX.Sim.Cloth
             if (cam != null)
             {
                 orbit = cam.GetComponent<OrbitCamera>();
+                grabber = cam.GetComponent<ParticleGrabber>();
                 cutter = cam.GetComponent<ClothCutter>();
                 if (cutter == null) cutter = cam.gameObject.AddComponent<ClothCutter>();
                 cutter.world = world;
@@ -159,6 +170,7 @@ namespace GamiX.Sim.Cloth
                 if (Pressed(kb, "w")) windOn = !windOn;
                 if (Pressed(kb, "t")) Rip();
                 if (Pressed(kb, "h")) showText = !showText;
+                if (Pressed(kb, "k")) showControls = !showControls;
                 if (Pressed(kb, "r")) Reload();
                 if (Pressed(kb, "v")) SetParticleView(!particleView);
                 if (kb.digit1Key.wasPressedThisFrame) ApplyShot(0);
@@ -172,8 +184,20 @@ namespace GamiX.Sim.Cloth
             float gust = 1f + gustiness * (2f * Mathf.PerlinNoise(t * 0.35f, 0.3f) - 1f);
             gustPercent = (gust - 1f) * 100f;
             float swirl = gustiness * (Mathf.PerlinNoise(0.7f, t * 0.25f) - 0.5f);
-            Vector3 w = Quaternion.Euler(0f, swirl * 40f, 0f) * wind * gust;
+            float a = (windAngle + swirl * 40f) * Mathf.Deg2Rad;
+            Vector3 w = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (windSpeed * gust);
             world.parameters.wind = windOn ? w : Vector3.zero;
+
+            // Clicking on the settings panel must not grab or cut the cloth behind it. The state only changes
+            // while the button is up, so a drag started in the scene keeps working over the panel.
+            Mouse mouse = Mouse.current;
+            if (mouse != null && !mouse.leftButton.isPressed)
+            {
+                Vector2 mp = mouse.position.ReadValue();
+                bool overPanel = showText && settingsScreenRect.Contains(new Vector2(mp.x, Screen.height - mp.y));
+                if (grabber != null) grabber.enabled = !overPanel;
+                if (cutter != null) cutter.enabled = !overPanel;
+            }
 
             if (world.Solver != null)
             {
@@ -316,11 +340,11 @@ namespace GamiX.Sim.Cloth
 
         // ================================================================ on-screen panels
 
-        private const float RefHeight = 1080f;   // the panels are laid out for 1080p and scaled to the screen
+        private const float RefHeight = 800f;    // virtual screen height of the layout: the panels scale with the screen
         private static readonly Color Panel = new Color(0.04f, 0.05f, 0.07f, 0.62f);
         private static readonly Color Accent = new Color(0.78f, 1f, 0.1f);
         private static readonly Color Warm = new Color(1f, 0.55f, 0.2f);
-        private GUIStyle titleStyle, headerStyle, keyStyle, textStyle, valueStyle, smallStyle;
+        private GUIStyle titleStyle, headerStyle, keyStyle, textStyle, valueStyle, numberStyle, smallStyle, buttonStyle;
 
         private void MakeStyles()
         {
@@ -335,6 +359,9 @@ namespace GamiX.Sim.Cloth
             keyStyle.normal.textColor = Color.white;
             valueStyle = new GUIStyle(textStyle) { fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft };
             valueStyle.normal.textColor = Color.white;
+            numberStyle = new GUIStyle(valueStyle) { alignment = TextAnchor.UpperRight };
+            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 17, richText = true };
+            buttonStyle.normal.textColor = buttonStyle.hover.textColor = buttonStyle.active.textColor = Color.white;
             smallStyle = new GUIStyle(textStyle) { fontSize = 14 };
             smallStyle.normal.textColor = new Color(0.65f, 0.7f, 0.76f);
         }
@@ -347,14 +374,15 @@ namespace GamiX.Sim.Cloth
             Matrix4x4 baseMatrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             GUI.matrix = baseMatrix;
             float width = Screen.width / scale;
-            DrawControls();
-            DrawLive(width, baseMatrix);
+            if (showControls) DrawControls();
+            Rect settings = DrawSettings(width, baseMatrix);
+            settingsScreenRect = new Rect(settings.x * scale, settings.y * scale, settings.width * scale, settings.height * scale);
             GUI.matrix = Matrix4x4.identity;
         }
 
         private void DrawControls()
         {
-            var r = new Rect(24, 24, 370, 570);
+            var r = new Rect(20, 20, 380, 682);
             Box(r);
             float x = r.x + 22, y = r.y + 16;
             GUI.Label(new Rect(x, y, 300, 36), "GamiX Cloth", titleStyle);
@@ -382,6 +410,7 @@ namespace GamiX.Sim.Cloth
                 ("P", "pause"),
                 ("R", "reset"),
                 ("H", "hide panels"),
+                ("K", "hide this list"),
             });
         }
 
@@ -391,67 +420,101 @@ namespace GamiX.Sim.Cloth
             y += 26;
             foreach (var (key, action) in rows)
             {
-                GUI.Label(new Rect(x, y, 120, 26), key, keyStyle);
-                GUI.Label(new Rect(x + 122, y, 220, 26), action, textStyle);
-                y += 28;
+                GUI.Label(new Rect(x, y, 120, 28), key, keyStyle);
+                GUI.Label(new Rect(x + 122, y, 230, 28), action, textStyle);
+                y += 32;
             }
             return y;
         }
 
-        private void DrawLive(float screenWidth, Matrix4x4 baseMatrix)
+        /// <summary>The settings panel: sliders and buttons that change the simulation while it runs.</summary>
+        private Rect DrawSettings(float screenWidth, Matrix4x4 baseMatrix)
         {
-            var r = new Rect(screenWidth - 24 - 390, 24, 390, 520);
+            var r = new Rect(screenWidth - 20 - 420, 20, 420, 742);
             Box(r);
-            var p = world.parameters;
-            float x = r.x + 22, y = r.y + 16, vx = x + 128;
-            GUI.Label(new Rect(x, y, 340, 22), "LIVE", headerStyle);
-            y += 32;
+            SolverParams p = world.parameters;
+            float x = r.x + 20, y = r.y + 14, right = r.xMax - 20;
+
+            // Wind
+            GUI.Label(new Rect(x, y, 200, 22), "WIND", headerStyle);
+            if (windOn) DrawWindArrow(new Vector2(right - 22, y + 18), 16f, baseMatrix);
+            y += 28;
+            windSpeed = Slider(x, right, ref y, "Speed", windSpeed, 0f, 15f, $"{windSpeed:F1} m/s");
+            windAngle = Slider(x, right, ref y, "Direction", windAngle, -180f, 180f, $"{windAngle:F0}°");
+            gustiness = Slider(x, right, ref y, "Gusts", gustiness, 0f, 1f, $"{gustiness * 100f:F0} %");
+            y += 8;
+
+            // Cloth
+            GUI.Label(new Rect(x, y, 200, 22), "CLOTH", headerStyle);
+            y += 28;
+            aero.drag = Slider(x, right, ref y, "Drag  k<size=13>d</size>", aero.drag, 0f, 4f, $"{aero.drag:F2}");
+            aero.lift = Slider(x, right, ref y, "Lift  k<size=13>l</size>", aero.lift, 0f, 2f, $"{aero.lift:F2}");
+            float tear = Slider(x, right, ref y, "Tear at", tearStrength, 1.1f, 3f, $"{(tearStrength - 1f) * 100f:F0} %");
+            if (!Mathf.Approximately(tear, tearStrength)) SetTearStrength(tear);
+            y += 8;
 
             // Solver
-            GUI.Label(new Rect(x, y, 120, 26), "Solver", textStyle);
-            GUI.Label(new Rect(vx, y, 230, 26), p.gaussSeidelDistance ? "Gauss-Seidel" : $"<color=#ff8c33>Jacobi</color>  (paper)", valueStyle);
+            GUI.Label(new Rect(x, y, 200, 22), "SOLVER", headerStyle);
+            y += 28;
+            p.substeps = Mathf.RoundToInt(Slider(x, right, ref y, "Sub-steps", p.substeps, 1f, 6f, $"{p.substeps}"));
+            p.iterations = Mathf.RoundToInt(Slider(x, right, ref y, "Iterations", p.iterations, 1f, 12f, $"{p.iterations}"));
+            p.relaxation = Slider(x, right, ref y, "Relaxation  ω", p.relaxation, 1f, 2f, $"{p.relaxation:F2}");
+            float g = -p.gravity.y;
+            g = Slider(x, right, ref y, "Gravity", g, 0f, 20f, $"{g:F1} m/s²");
+            p.gravity = new Vector3(0f, -g, 0f);
+            y += 6;
+
+            // Buttons
+            float bw = (right - x - 16f) / 3f;
+            if (GUI.Button(new Rect(x, y, 2 * bw + 8, 36), p.gaussSeidelDistance ? "Gauss-Seidel" : "<color=#ff8c33>Jacobi (paper)</color>", buttonStyle))
+                p.gaussSeidelDistance = !p.gaussSeidelDistance;
+            if (GUI.Button(new Rect(x + 2 * bw + 16, y, bw, 36), windOn ? "Wind on" : "<color=#8a929c>Wind off</color>", buttonStyle))
+                windOn = !windOn;
+            y += 44;
+            if (GUI.Button(new Rect(x, y, bw, 36), particleView ? "Mesh" : "Particles", buttonStyle))
+                SetParticleView(!particleView);
+            if (GUI.Button(new Rect(x + bw + 8, y, bw, 36), "Rip", buttonStyle))
+                Rip();
+            if (GUI.Button(new Rect(x + 2 * bw + 16, y, bw, 36), "Reset", buttonStyle))
+                Reload();
+            y += 50;
+
+            // Readout
+            GUI.Label(new Rect(x, y, 200, 26), "Flag stretch", textStyle);
+            GUI.Label(new Rect(right - 100, y, 100, 26), $"{stretchNow:F1} %", numberStyle);
+            y += 30;
+            DrawStretchGraph(new Rect(x, y, right - x, 54));
+            y += 54 + 26;
+            GUI.Label(new Rect(x, y, right - x, 24), $"Torn <b>{tornEdges}</b> edges   ·   split <b>{splitVertices}</b> vertices", textStyle);
             y += 26;
-            GUI.Label(new Rect(vx, y, 230, 22), $"{p.substeps} sub-steps × {p.iterations} iterations", smallStyle);
-            y += 34;
-
-            // Wind with an arrow seen from the camera
-            GUI.Label(new Rect(x, y, 120, 26), "Wind", textStyle);
-            if (windOn)
-            {
-                GUI.Label(new Rect(vx, y, 120, 26), $"{p.wind.magnitude:F1} m/s", valueStyle);
-                GUI.Label(new Rect(vx, y + 26, 160, 22), $"gust {gustPercent:+0;-0} %", smallStyle);
-                DrawWindArrow(new Vector2(r.xMax - 62, y + 22), 26f, baseMatrix);
-            }
-            else
-            {
-                GUI.Label(new Rect(vx, y, 120, 26), "<color=#8a929c>off</color>", valueStyle);
-            }
-            y += 62;
-
-            // Stretch and its history
-            GUI.Label(new Rect(x, y, 120, 26), "Stretch", textStyle);
-            GUI.Label(new Rect(vx, y, 120, 26), $"{stretchNow:F1} %", valueStyle);
-            GUI.Label(new Rect(vx + 92, y + 3, 150, 22), "flag, max edge", smallStyle);
-            y += 32;
-            DrawStretchGraph(new Rect(x, y, r.width - 44, 70));
-            y += 70 + 22;
-
-            // Tearing and cost
-            Row(x, vx, ref y, "Torn", $"{tornEdges} edges");
-            Row(x, vx, ref y, "Split", $"{splitVertices} vertices");
-            Row(x, vx, ref y, "Particles", $"{world.Solver.ActiveCount:N0}");
-            Row(x, vx, ref y, "Physics", $"{smoothMs:F1} ms   ·   {smoothFps:F0} FPS");
-            if (cutter != null && cutter.Cutting)
-                GUI.Label(new Rect(x, y + 4, 300, 26), "<color=#c8ff00>CUTTING</color>", valueStyle);
-            if (world.paused)
-                GUI.Label(new Rect(x + 140, y + 4, 200, 26), "<color=#ff8c33>PAUSED</color>", valueStyle);
+            GUI.Label(new Rect(x, y, right - x, 24),
+                      $"<b>{world.Solver.ActiveCount:N0}</b> particles   ·   <b>{smoothMs:F1}</b> ms   ·   <b>{smoothFps:F0}</b> FPS", textStyle);
+            y += 28;
+            string status = (cutter != null && cutter.Cutting ? "<color=#c8ff00><b>CUTTING</b></color>   " : "") +
+                            (world.paused ? "<color=#ff8c33><b>PAUSED</b></color>   " : "");
+            GUI.Label(new Rect(x, y, right - x, 22), status + "K: controls   ·   H: hide", smallStyle);
+            return r;
         }
 
-        private void Row(float x, float vx, ref float y, string label, string value)
+        /// <summary>One settings row: label, slider and value on the same line.</summary>
+        private float Slider(float x, float right, ref float y, string label, float value, float min, float max, string shown)
         {
-            GUI.Label(new Rect(x, y, 120, 26), label, textStyle);
-            GUI.Label(new Rect(vx, y, 240, 26), value, valueStyle);
-            y += 32;
+            GUI.Label(new Rect(x, y, 130, 28), label, textStyle);
+            float v = GUI.HorizontalSlider(new Rect(x + 132, y + 9, right - x - 132 - 92, 18), value, min, max);
+            GUI.Label(new Rect(right - 88, y, 88, 28), shown, numberStyle);
+            y += 34;
+            return v;
+        }
+
+        private void SetTearStrength(float ratio)
+        {
+            tearStrength = ratio;
+            foreach (ParticleCloth c in new[] { curtain, sheet })
+            {
+                if (c == null) continue;
+                c.tearRatio = ratio;
+                if (c.Tearing != null) c.Tearing.tearRatio = ratio;
+            }
         }
 
         private void DrawStretchGraph(Rect g)
