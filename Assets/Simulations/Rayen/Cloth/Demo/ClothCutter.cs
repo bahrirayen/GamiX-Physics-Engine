@@ -28,7 +28,9 @@ namespace GamiX.Sim.Cloth
         private void Update()
         {
             Keyboard kb = Keyboard.current;
-            Cutting = kb != null && kb.cKey.isPressed && Mouse.current != null;
+            // The key labeled C in the current layout (AZERTY or QWERTY).
+            var cKey = kb != null ? kb.FindKeyOnCurrentKeyboardLayout("c") : null;
+            Cutting = cKey != null && cKey.isPressed && Mouse.current != null;
             if (!Cutting || world == null || world.Solver == null || cam == null)
             {
                 hasLast = false;

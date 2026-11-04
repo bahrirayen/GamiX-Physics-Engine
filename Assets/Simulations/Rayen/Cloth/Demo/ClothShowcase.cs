@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GamiX.Physics.Components;
 using GamiX.Physics.Demos;
 using GamiX.Physics.Rendering;
@@ -13,7 +14,8 @@ namespace GamiX.Sim.Cloth
     /// tears when it is pulled or cut (real mesh splitting), and a sheet that falls on obstacles.
     ///
     /// Controls: left drag = grab and pull, hold C = cut, T = rip the curtain apart, J = Jacobi / Gauss-Seidel
-    /// distance constraints, W = wind, 1-4 = camera shots, R = reset, H = hide the text, Space = impulse, P = pause.
+    /// distance constraints, W = wind, V = particle view, 1-4 = camera shots, R = reset, H = hide the text,
+    /// Space = impulse, P = pause. Letters are read by their label, so AZERTY and QWERTY keyboards both work.
     /// </summary>
     public sealed class ClothShowcase : MonoBehaviour
     {
@@ -28,7 +30,10 @@ namespace GamiX.Sim.Cloth
         private ClothCutter cutter;
         private OrbitCamera orbit;
         private bool windOn = true;
+        private bool particleView;
         private float smoothMs;
+        private readonly List<Matrix4x4> particleBatch = new List<Matrix4x4>(1023);
+        private readonly Matrix4x4[] particleBuffer = new Matrix4x4[1023];
 
         // Rip: an invisible blade runs up the middle of the curtain, then the two halves are pushed apart.
         private float ripTime = -1f;
@@ -142,11 +147,12 @@ namespace GamiX.Sim.Cloth
             Keyboard kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.jKey.wasPressedThisFrame) world.parameters.gaussSeidelDistance = !world.parameters.gaussSeidelDistance;
-                if (kb.wKey.wasPressedThisFrame) windOn = !windOn;
-                if (kb.tKey.wasPressedThisFrame) Rip();
-                if (kb.hKey.wasPressedThisFrame) showText = !showText;
-                if (kb.rKey.wasPressedThisFrame) Reload();
+                if (Pressed(kb, "j")) world.parameters.gaussSeidelDistance = !world.parameters.gaussSeidelDistance;
+                if (Pressed(kb, "w")) windOn = !windOn;
+                if (Pressed(kb, "t")) Rip();
+                if (Pressed(kb, "h")) showText = !showText;
+                if (Pressed(kb, "r")) Reload();
+                if (Pressed(kb, "v")) SetParticleView(!particleView);
                 if (kb.digit1Key.wasPressedThisFrame) ApplyShot(0);
                 if (kb.digit2Key.wasPressedThisFrame) ApplyShot(1);
                 if (kb.digit3Key.wasPressedThisFrame) ApplyShot(2);
@@ -162,6 +168,57 @@ namespace GamiX.Sim.Cloth
 
             if (world.Solver != null)
                 smoothMs = Mathf.Lerp(smoothMs, (float)world.Solver.LastStepMilliseconds, 0.1f);
+        }
+
+        /// <summary>
+        /// Key by the letter printed on it, in the current keyboard layout (the Input System's Key enum is the
+        /// physical position on a US keyboard: on AZERTY, Key.W is the key labeled Z).
+        /// </summary>
+        public static bool Pressed(Keyboard kb, string label)
+        {
+            var key = kb.FindKeyOnCurrentKeyboardLayout(label);
+            return key != null && key.wasPressedThisFrame;
+        }
+
+        /// <summary>
+        /// Particle view (like the paper's fig. 17): hides the cloth meshes and draws the particles they are made of.
+        /// </summary>
+        public void SetParticleView(bool on)
+        {
+            particleView = on;
+            foreach (ParticleCloth c in new[] { flag, curtain, sheet })
+                if (c != null) c.GetComponent<MeshRenderer>().enabled = !on;
+        }
+
+        private void LateUpdate()
+        {
+            if (!particleView || world == null || world.Solver == null) return;
+            UnifiedSolver s = world.Solver;
+            float d = 2f * s.parameters.radius;
+            DrawParticles(s, flag, new Color(0.1f, 0.75f, 0.8f), d);
+            DrawParticles(s, curtain, new Color(0.8f, 0.2f, 0.2f), d);
+            DrawParticles(s, sheet, new Color(0.6f, 0.75f, 0.95f), d);
+        }
+
+        private void DrawParticles(UnifiedSolver s, ParticleCloth cloth, Color color, float diameter)
+        {
+            if (cloth == null || cloth.Tearing == null) return;
+            var rp = new RenderParams(RenderUtils.GetSharedMaterial(color));
+            Mesh sphere = RenderUtils.SphereMesh;
+            particleBatch.Clear();
+            for (int k = 0; k < cloth.Tearing.MeshVertexCount; k++)
+            {
+                particleBatch.Add(RenderUtils.ScaleTranslation(s.positions[cloth.Tearing.MeshParticle(k)], diameter));
+                if (particleBatch.Count == particleBuffer.Length)
+                {
+                    particleBatch.CopyTo(particleBuffer);
+                    Graphics.RenderMeshInstanced(rp, sphere, 0, particleBuffer, particleBatch.Count);
+                    particleBatch.Clear();
+                }
+            }
+            if (particleBatch.Count == 0) return;
+            particleBatch.CopyTo(particleBuffer);
+            Graphics.RenderMeshInstanced(rp, sphere, 0, particleBuffer, particleBatch.Count);
         }
 
         /// <summary>Rips the curtain from the bottom up along a slightly wavy line (repeatable, for recording).</summary>
@@ -248,17 +305,17 @@ namespace GamiX.Sim.Cloth
             string mode = p.gaussSeidelDistance ? "Gauss-Seidel" : "Jacobi (paper)";
 
             GUI.color = new Color(0f, 0f, 0f, 0.45f);
-            GUI.DrawTexture(new Rect(12, 12, 520, 168), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(12, 12, 700, 168), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            GUI.Label(new Rect(24, 18, 500, 28), "GamiX Cloth  ·  paper §8", title);
-            GUI.Label(new Rect(24, 50, 500, 22),
+            GUI.Label(new Rect(24, 18, 680, 28), "GamiX Cloth  ·  paper §8", title);
+            GUI.Label(new Rect(24, 50, 680, 22),
                       $"Distance constraints: <b>{mode}</b>   ·   flag max stretch: <b>{stretch:F1} %</b>", style);
-            GUI.Label(new Rect(24, 72, 500, 22),
+            GUI.Label(new Rect(24, 72, 680, 22),
                       $"Wind: <b>{(windOn ? p.wind.magnitude.ToString("F1") + " m/s" : "off")}</b>   ·   torn edges: <b>{torn}</b>   ·   split vertices: <b>{splits}</b>", style);
-            GUI.Label(new Rect(24, 94, 500, 22),
+            GUI.Label(new Rect(24, 94, 680, 22),
                       $"Particles: <b>{world.Solver.ActiveCount}</b>   ·   solver: <b>{smoothMs:F1} ms</b>{(cutter != null && cutter.Cutting ? "   ·   <color=#c8ff00><b>CUTTING</b></color>" : "")}", style);
-            GUI.Label(new Rect(24, 122, 500, 22), "Left drag: pull   ·   hold <b>C</b>: cut   ·   <b>T</b>: rip the curtain   ·   <b>J</b>: solver   ·   <b>W</b>: wind", style);
-            GUI.Label(new Rect(24, 144, 500, 22), "<b>1-4</b>: camera   ·   <b>R</b>: reset   ·   <b>H</b>: hide text   ·   Space: impulse   ·   P: pause", style);
+            GUI.Label(new Rect(24, 122, 680, 22), "Left drag: pull   ·   hold <b>C</b>: cut   ·   <b>T</b>: rip the curtain   ·   <b>J</b>: solver   ·   <b>W</b>: wind", style);
+            GUI.Label(new Rect(24, 144, 680, 22), "<b>V</b>: particles   ·   <b>1-4</b>: camera   ·   <b>R</b>: reset   ·   <b>H</b>: hide text   ·   Space: impulse   ·   P: pause", style);
         }
     }
 }

@@ -17,11 +17,14 @@ Scene: `Scenes/ClothShowcase.unity`. It has three pieces of cloth, all simulated
 | **T** | Rip the curtain from the bottom up (always the same, good for recording) |
 | **J** | Switch the distance constraints between Gauss-Seidel and Jacobi (the paper's solver) |
 | **W** | Wind on / off |
+| **V** | Particle view: hide the meshes and show the particles the cloth is made of (like the paper's fig. 17) |
 | **1** to **4** | Camera shots: wide, flag, curtain, sheet |
 | **R** | Reset the scene |
 | **H** | Hide the text (clean recording) |
 | Space / P | Radial impulse under the mouse / pause |
 | Right / middle mouse, wheel, F | Orbit / pan, zoom, reset the camera |
+
+Letters are read by the label printed on the key, so the controls are the same on AZERTY and QWERTY keyboards.
 
 ## Cloth model
 
@@ -113,3 +116,4 @@ double-sided (a second set of vertices with flipped winding) and its normals are
 2. Wide shot (**1**): let the sheet fall and the flag fly for a few seconds.
 3. Curtain shot (**3**): press **T** for the rip, or hold **C** and draw a cut. Press **R** to start again.
 4. Flag shot (**2**): press **J** a few times to show Jacobi stretching the flag.
+5. Press **V** at any time to show that the cloth is made of particles: the mesh is only drawn on top of them.
