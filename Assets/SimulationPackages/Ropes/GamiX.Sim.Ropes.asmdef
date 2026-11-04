@@ -1,0 +1,18 @@
+{
+    "name": "GamiX.Sim.Ropes",
+    "rootNamespace": "GamiX.Sim.Ropes",
+    "references": [
+        "GamiX.Physics",
+        "GamiX.Physics.Demos",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

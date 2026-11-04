@@ -31,7 +31,7 @@ namespace GamiX.Physics.Rendering
 
         private void RefreshGroups(UnifiedSolver solver)
         {
-            ParticleBody[] bodies = FindObjectsByType<ParticleBody>();
+            ParticleBody[] bodies = FindObjectsByType<ParticleBody>(FindObjectsSortMode.None);
             if (bodies.Length == knownBodies) return;
             knownBodies = bodies.Length;
             groupColors.Clear();
