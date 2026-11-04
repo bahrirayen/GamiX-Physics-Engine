@@ -31,6 +31,7 @@ namespace GamiX.Sim.Cloth
         }
 
         private readonly UnifiedSolver solver;
+        private readonly ClothHandle cloth;
         private readonly int resU;
         private readonly int vertexCount;
         private readonly float[] baseInvMass;     // per original vertex (pinned = 0)
@@ -77,6 +78,7 @@ namespace GamiX.Sim.Cloth
         public ClothTearing(UnifiedSolver solver, ClothHandle cloth, int firstConstraint, int constraintCount)
         {
             this.solver = solver;
+            this.cloth = cloth;
             resU = cloth.width;
             int resV = cloth.height;
             vertexCount = cloth.particles.Length;
@@ -323,7 +325,20 @@ namespace GamiX.Sim.Cloth
                 Reattach(l);
 
             if (changed)
+            {
                 Version++;
+                // Keep the cloth's triangles (read by the aerodynamics) in sync with the split mesh: a triangle
+                // spanning both sides of a tear would otherwise grow huge and receive a huge wind force.
+                var live = new List<int>(triPart.Length);
+                for (int t = 0; t < detached.Length; t++)
+                {
+                    if (detached[t]) continue;
+                    live.Add(triPart[3 * t]);
+                    live.Add(triPart[3 * t + 1]);
+                    live.Add(triPart[3 * t + 2]);
+                }
+                cloth.triangles = live.ToArray();
+            }
             return changed;
         }
 

@@ -53,11 +53,21 @@ namespace GamiX.Sim.Cloth
                     Vector3 force = vRel * (-drag * area * nv)
                                     + (n - vHat * VMath.Dot(n, vHat)) * (-lift * area * nv * speed);
                     Vector3 perVertex = force * (h / 3f);
-                    velocities[a] += perVertex * invMass[a];
-                    velocities[b] += perVertex * invMass[b];
-                    velocities[d] += perVertex * invMass[d];
+                    velocities[a] += Limit(perVertex * invMass[a]);
+                    velocities[b] += Limit(perVertex * invMass[b]);
+                    velocities[d] += Limit(perVertex * invMass[d]);
                 }
             }
+        }
+
+        /// <summary>Safety net: the wind never changes a velocity by more than this per sub-step (m/s).</summary>
+        public float maxVelocityChange = 2f;
+
+        private Vector3 Limit(Vector3 dv)
+        {
+            float l2 = VMath.LengthSq(dv);
+            float m = maxVelocityChange;
+            return l2 > m * m ? dv * (m / Mathf.Sqrt(l2)) : dv;
         }
     }
 
