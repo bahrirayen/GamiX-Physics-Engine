@@ -20,11 +20,16 @@ Scene: `Scenes/ClothShowcase.unity`. It has three pieces of cloth, all simulated
 | **V** | Particle view: hide the meshes and show the particles the cloth is made of (like the paper's fig. 17) |
 | **1** to **4** | Camera shots: wide, flag, curtain, sheet |
 | **R** | Reset the scene |
-| **H** | Hide the text (clean recording) |
+| **H** | Hide the panels (clean recording) |
 | Space / P | Radial impulse under the mouse / pause |
 | Right / middle mouse, wheel, F | Orbit / pan, zoom, reset the camera |
 
 Letters are read by the label printed on the key, so the controls are the same on AZERTY and QWERTY keyboards.
+
+On screen, the left panel lists the controls and the right panel shows live values: solver mode, sub-steps and
+iterations, wind speed, gust and direction (arrow seen from the camera), the flag's maximum stretch with a graph
+of the last 6 seconds (green = Gauss-Seidel, orange = Jacobi), torn edges, split vertices, particles, physics time
+and FPS. The panels are laid out for 1080p and scale with the screen.
 
 ## Cloth model
 

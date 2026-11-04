@@ -31,7 +31,15 @@ namespace GamiX.Sim.Cloth
         private OrbitCamera orbit;
         private bool windOn = true;
         private bool particleView;
-        private float smoothMs;
+        private float smoothMs, smoothFps = 60f, gustPercent, stretchNow;
+        private int tornEdges, splitVertices;
+
+        // Stretch history for the graph: one sample every 0.1 s, the last 6 s.
+        private const int HistoryLength = 60;
+        private readonly float[] stretchHistory = new float[HistoryLength];
+        private readonly bool[] jacobiHistory = new bool[HistoryLength];
+        private int historyHead;
+        private float historyTimer;
         private readonly List<Matrix4x4> particleBatch = new List<Matrix4x4>(1023);
         private readonly Matrix4x4[] particleBuffer = new Matrix4x4[1023];
 
@@ -162,12 +170,17 @@ namespace GamiX.Sim.Cloth
             // Gusty wind: slow changes of strength and direction from Perlin noise.
             float t = Time.time;
             float gust = 1f + gustiness * (2f * Mathf.PerlinNoise(t * 0.35f, 0.3f) - 1f);
+            gustPercent = (gust - 1f) * 100f;
             float swirl = gustiness * (Mathf.PerlinNoise(0.7f, t * 0.25f) - 0.5f);
             Vector3 w = Quaternion.Euler(0f, swirl * 40f, 0f) * wind * gust;
             world.parameters.wind = windOn ? w : Vector3.zero;
 
             if (world.Solver != null)
+            {
                 smoothMs = Mathf.Lerp(smoothMs, (float)world.Solver.LastStepMilliseconds, 0.1f);
+                smoothFps = Mathf.Lerp(smoothFps, 1f / Mathf.Max(1e-4f, Time.unscaledDeltaTime), 0.05f);
+                SampleLiveValues();
+            }
         }
 
         /// <summary>
@@ -282,40 +295,220 @@ namespace GamiX.Sim.Cloth
             orbit.pitch = Shots[i].pitch;
         }
 
-        private GUIStyle style, title;
+        private void SampleLiveValues()
+        {
+            UnifiedSolver solver = world.Solver;
+            tornEdges = splitVertices = 0;
+            foreach (ParticleCloth c in new[] { flag, curtain, sheet })
+            {
+                if (c == null || c.Tearing == null) continue;
+                tornEdges += c.Tearing.TornEdgeCount;
+                splitVertices += c.Tearing.SplitCount;
+            }
+            stretchNow = flag != null && flag.Cloth != null ? flag.MaxStretch(solver) * 100f : 0f;
+            historyTimer += Time.deltaTime;
+            if (historyTimer < 0.1f) return;
+            historyTimer = 0f;
+            stretchHistory[historyHead] = stretchNow;
+            jacobiHistory[historyHead] = !world.parameters.gaussSeidelDistance;
+            historyHead = (historyHead + 1) % HistoryLength;
+        }
+
+        // ================================================================ on-screen panels
+
+        private const float RefHeight = 1080f;   // the panels are laid out for 1080p and scaled to the screen
+        private static readonly Color Panel = new Color(0.04f, 0.05f, 0.07f, 0.62f);
+        private static readonly Color Accent = new Color(0.78f, 1f, 0.1f);
+        private static readonly Color Warm = new Color(1f, 0.55f, 0.2f);
+        private GUIStyle titleStyle, headerStyle, keyStyle, textStyle, valueStyle, smallStyle;
+
+        private void MakeStyles()
+        {
+            if (titleStyle != null) return;
+            textStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, richText = true };
+            textStyle.normal.textColor = new Color(0.86f, 0.89f, 0.93f);
+            titleStyle = new GUIStyle(textStyle) { fontSize = 28, fontStyle = FontStyle.Bold };
+            titleStyle.normal.textColor = Color.white;
+            headerStyle = new GUIStyle(textStyle) { fontSize = 15, fontStyle = FontStyle.Bold };
+            headerStyle.normal.textColor = Accent;
+            keyStyle = new GUIStyle(textStyle) { fontStyle = FontStyle.Bold };
+            keyStyle.normal.textColor = Color.white;
+            valueStyle = new GUIStyle(textStyle) { fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft };
+            valueStyle.normal.textColor = Color.white;
+            smallStyle = new GUIStyle(textStyle) { fontSize = 14 };
+            smallStyle.normal.textColor = new Color(0.65f, 0.7f, 0.76f);
+        }
 
         private void OnGUI()
         {
             if (!showText || world == null || world.Solver == null) return;
-            if (style == null)
-            {
-                style = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
-                style.normal.textColor = new Color(0.92f, 0.94f, 0.96f);
-                title = new GUIStyle(style) { fontSize = 20, fontStyle = FontStyle.Bold };
-            }
-            var p = world.parameters;
-            int torn = 0, splits = 0;
-            foreach (ParticleCloth c in new[] { flag, curtain, sheet })
-            {
-                if (c == null || c.Tearing == null) continue;
-                torn += c.Tearing.TornEdgeCount;
-                splits += c.Tearing.SplitCount;
-            }
-            float stretch = flag != null && flag.Cloth != null ? flag.MaxStretch(world.Solver) * 100f : 0f;
-            string mode = p.gaussSeidelDistance ? "Gauss-Seidel" : "Jacobi (paper)";
+            MakeStyles();
+            float scale = Screen.height / RefHeight;
+            Matrix4x4 baseMatrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+            GUI.matrix = baseMatrix;
+            float width = Screen.width / scale;
+            DrawControls();
+            DrawLive(width, baseMatrix);
+            GUI.matrix = Matrix4x4.identity;
+        }
 
-            GUI.color = new Color(0f, 0f, 0f, 0.45f);
-            GUI.DrawTexture(new Rect(12, 12, 700, 168), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.Label(new Rect(24, 18, 680, 28), "GamiX Cloth  ·  paper §8", title);
-            GUI.Label(new Rect(24, 50, 680, 22),
-                      $"Distance constraints: <b>{mode}</b>   ·   flag max stretch: <b>{stretch:F1} %</b>", style);
-            GUI.Label(new Rect(24, 72, 680, 22),
-                      $"Wind: <b>{(windOn ? p.wind.magnitude.ToString("F1") + " m/s" : "off")}</b>   ·   torn edges: <b>{torn}</b>   ·   split vertices: <b>{splits}</b>", style);
-            GUI.Label(new Rect(24, 94, 680, 22),
-                      $"Particles: <b>{world.Solver.ActiveCount}</b>   ·   solver: <b>{smoothMs:F1} ms</b>{(cutter != null && cutter.Cutting ? "   ·   <color=#c8ff00><b>CUTTING</b></color>" : "")}", style);
-            GUI.Label(new Rect(24, 122, 680, 22), "Left drag: pull   ·   hold <b>C</b>: cut   ·   <b>T</b>: rip the curtain   ·   <b>J</b>: solver   ·   <b>W</b>: wind", style);
-            GUI.Label(new Rect(24, 144, 680, 22), "<b>V</b>: particles   ·   <b>1-4</b>: camera   ·   <b>R</b>: reset   ·   <b>H</b>: hide text   ·   Space: impulse   ·   P: pause", style);
+        private void DrawControls()
+        {
+            var r = new Rect(24, 24, 370, 570);
+            Box(r);
+            float x = r.x + 22, y = r.y + 16;
+            GUI.Label(new Rect(x, y, 300, 36), "GamiX Cloth", titleStyle);
+            y += 36;
+            GUI.Label(new Rect(x, y, 300, 22), "Unified particle physics  ·  paper §8", smallStyle);
+            y += 40;
+
+            y = Section(x, y, "MOUSE", new[]
+            {
+                ("Left drag", "pull the cloth"),
+                ("Right drag", "orbit"),
+                ("Middle drag", "pan"),
+                ("Wheel", "zoom"),
+            });
+            y += 14;
+            Section(x, y, "KEYS", new[]
+            {
+                ("C  (hold)", "cut with the blade"),
+                ("T", "rip the curtain"),
+                ("J", "Jacobi / Gauss-Seidel"),
+                ("W", "wind on / off"),
+                ("V", "particles / mesh"),
+                ("1 - 4", "camera shots"),
+                ("Space", "impulse"),
+                ("P", "pause"),
+                ("R", "reset"),
+                ("H", "hide panels"),
+            });
+        }
+
+        private float Section(float x, float y, string header, (string key, string action)[] rows)
+        {
+            GUI.Label(new Rect(x, y, 300, 22), header, headerStyle);
+            y += 26;
+            foreach (var (key, action) in rows)
+            {
+                GUI.Label(new Rect(x, y, 120, 26), key, keyStyle);
+                GUI.Label(new Rect(x + 122, y, 220, 26), action, textStyle);
+                y += 28;
+            }
+            return y;
+        }
+
+        private void DrawLive(float screenWidth, Matrix4x4 baseMatrix)
+        {
+            var r = new Rect(screenWidth - 24 - 390, 24, 390, 520);
+            Box(r);
+            var p = world.parameters;
+            float x = r.x + 22, y = r.y + 16, vx = x + 128;
+            GUI.Label(new Rect(x, y, 340, 22), "LIVE", headerStyle);
+            y += 32;
+
+            // Solver
+            GUI.Label(new Rect(x, y, 120, 26), "Solver", textStyle);
+            GUI.Label(new Rect(vx, y, 230, 26), p.gaussSeidelDistance ? "Gauss-Seidel" : $"<color=#ff8c33>Jacobi</color>  (paper)", valueStyle);
+            y += 26;
+            GUI.Label(new Rect(vx, y, 230, 22), $"{p.substeps} sub-steps × {p.iterations} iterations", smallStyle);
+            y += 34;
+
+            // Wind with an arrow seen from the camera
+            GUI.Label(new Rect(x, y, 120, 26), "Wind", textStyle);
+            if (windOn)
+            {
+                GUI.Label(new Rect(vx, y, 120, 26), $"{p.wind.magnitude:F1} m/s", valueStyle);
+                GUI.Label(new Rect(vx, y + 26, 160, 22), $"gust {gustPercent:+0;-0} %", smallStyle);
+                DrawWindArrow(new Vector2(r.xMax - 62, y + 22), 26f, baseMatrix);
+            }
+            else
+            {
+                GUI.Label(new Rect(vx, y, 120, 26), "<color=#8a929c>off</color>", valueStyle);
+            }
+            y += 62;
+
+            // Stretch and its history
+            GUI.Label(new Rect(x, y, 120, 26), "Stretch", textStyle);
+            GUI.Label(new Rect(vx, y, 120, 26), $"{stretchNow:F1} %", valueStyle);
+            GUI.Label(new Rect(vx + 92, y + 3, 150, 22), "flag, max edge", smallStyle);
+            y += 32;
+            DrawStretchGraph(new Rect(x, y, r.width - 44, 70));
+            y += 70 + 22;
+
+            // Tearing and cost
+            Row(x, vx, ref y, "Torn", $"{tornEdges} edges");
+            Row(x, vx, ref y, "Split", $"{splitVertices} vertices");
+            Row(x, vx, ref y, "Particles", $"{world.Solver.ActiveCount:N0}");
+            Row(x, vx, ref y, "Physics", $"{smoothMs:F1} ms   ·   {smoothFps:F0} FPS");
+            if (cutter != null && cutter.Cutting)
+                GUI.Label(new Rect(x, y + 4, 300, 26), "<color=#c8ff00>CUTTING</color>", valueStyle);
+            if (world.paused)
+                GUI.Label(new Rect(x + 140, y + 4, 200, 26), "<color=#ff8c33>PAUSED</color>", valueStyle);
+        }
+
+        private void Row(float x, float vx, ref float y, string label, string value)
+        {
+            GUI.Label(new Rect(x, y, 120, 26), label, textStyle);
+            GUI.Label(new Rect(vx, y, 240, 26), value, valueStyle);
+            y += 32;
+        }
+
+        private void DrawStretchGraph(Rect g)
+        {
+            const float maxPercent = 25f;
+            Fill(g, new Color(1f, 1f, 1f, 0.05f));
+            // Reference line at 10 %.
+            float y10 = g.yMax - g.height * (10f / maxPercent);
+            Fill(new Rect(g.x, y10, g.width, 1f), new Color(1f, 1f, 1f, 0.25f));
+            GUI.Label(new Rect(g.xMax - 40, y10 - 18, 40, 18), "10 %", smallStyle);
+            float bar = g.width / HistoryLength;
+            for (int k = 0; k < HistoryLength; k++)
+            {
+                int i = (historyHead + k) % HistoryLength; // oldest first
+                float h = g.height * Mathf.Clamp01(stretchHistory[i] / maxPercent);
+                if (h <= 0f) continue;
+                Fill(new Rect(g.x + k * bar, g.yMax - h, Mathf.Max(1f, bar - 1f), h), jacobiHistory[i] ? Warm : Accent);
+            }
+            GUI.Label(new Rect(g.x, g.yMax + 2, g.width, 20),
+                      "<color=#c8ff00>■</color> Gauss-Seidel    <color=#ff8c33>■</color> Jacobi    last 6 s", smallStyle);
+        }
+
+        /// <summary>Wind direction as seen from the camera (right = to the right of the screen, up = away).</summary>
+        private void DrawWindArrow(Vector2 center, float radius, Matrix4x4 baseMatrix)
+        {
+            Camera cam = Camera.main;
+            Vector3 w = world.parameters.wind;
+            if (cam == null || w.sqrMagnitude < 1e-6f) return;
+            Vector3 right = cam.transform.right, forward = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+            var dir = new Vector2(Vector3.Dot(w, right), -Vector3.Dot(w, forward)).normalized; // GUI y points down
+            Fill(new Rect(center.x - radius - 6, center.y - radius - 6, 2 * radius + 12, 2 * radius + 12), new Color(1f, 1f, 1f, 0.05f));
+            Vector2 tail = center - dir * radius, tip = center + dir * radius;
+            Line(tail, tip, 4f, Accent, baseMatrix);
+            Vector2 back = -dir * 12f, side = new Vector2(-dir.y, dir.x) * 8f;
+            Line(tip, tip + back + side, 4f, Accent, baseMatrix);
+            Line(tip, tip + back - side, 4f, Accent, baseMatrix);
+        }
+
+        private static void Line(Vector2 a, Vector2 b, float width, Color color, Matrix4x4 baseMatrix)
+        {
+            Vector2 d = b - a;
+            float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+            GUI.matrix = baseMatrix;
+            // RotateAroundPivot takes screen coordinates: convert the pivot through the scale.
+            GUIUtility.RotateAroundPivot(angle, baseMatrix.MultiplyPoint3x4(a));
+            Fill(new Rect(a.x, a.y - width * 0.5f, d.magnitude, width), color);
+            GUI.matrix = baseMatrix;
+        }
+
+        private static void Box(Rect r) => Fill(r, Panel);
+
+        private static void Fill(Rect r, Color c)
+        {
+            Color old = GUI.color;
+            GUI.color = c;
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = old;
         }
     }
 }
