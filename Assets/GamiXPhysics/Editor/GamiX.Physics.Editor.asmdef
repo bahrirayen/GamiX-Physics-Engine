@@ -1,0 +1,19 @@
+{
+    "name": "GamiX.Physics.Editor",
+    "rootNamespace": "GamiX.Physics.Editor",
+    "references": [
+        "GamiX.Physics",
+        "GamiX.Physics.Demos"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

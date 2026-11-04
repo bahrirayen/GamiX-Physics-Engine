@@ -1,0 +1,17 @@
+{
+    "name": "GamiX.Physics.Demos",
+    "rootNamespace": "GamiX.Physics.Demos",
+    "references": [
+        "GamiX.Physics",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
