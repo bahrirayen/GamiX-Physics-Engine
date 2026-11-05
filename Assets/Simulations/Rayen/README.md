@@ -2,7 +2,8 @@
 
 Owner: Rayen Bahri
 
-Simulation from the paper: _to be chosen_
+Simulation from the paper: **cloth (§8) with real tearing**. See [Cloth/README.md](Cloth/README.md).
 
-Put your scene, scripts (namespace `GamiX.Sim.Rayen`), prefabs and materials in this folder. See
-[CONTRIBUTING.md](../../../CONTRIBUTING.md) before changing anything outside it.
+Scene: `Cloth/Scenes/ClothShowcase.unity`.
+
+See [CONTRIBUTING.md](../../../CONTRIBUTING.md) before changing anything outside this folder.

@@ -1,0 +1,19 @@
+{
+    "name": "GamiX.Sim.Cloth",
+    "rootNamespace": "GamiX.Sim.Cloth",
+    "references": [
+        "GamiX.Physics",
+        "GamiX.Physics.Demos",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
