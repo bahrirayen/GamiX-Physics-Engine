@@ -1,0 +1,19 @@
+{
+    "name": "GamiX.Sim.Yassine.Editor",
+    "rootNamespace": "GamiX.Sim.Yassine.Editor",
+    "references": [
+        "GamiX.Sim.Yassine",
+        "GamiX.Physics.Demos"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
