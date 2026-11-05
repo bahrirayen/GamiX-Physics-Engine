@@ -148,11 +148,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2700a4f2425ce614cbe153078961cf03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GamiX.Sim.Cloth::GamiX.Sim.Cloth.ConstraintExplainer
-  record: 0
-  recordFolder: 
+  record: 1
+  recordFolder: C:\Users\Rayen\AppData\Local\Temp\claude\f3bb573821a8a218\17d3743f-2e03-4165-a45e-e9dc5c689e1d\scratchpad\frames
   recordWidth: 1920
   recordHeight: 1080
   recordFps: 30
+  summedFormula: {fileID: 2800000, guid: 69e65a414edc3b4438430227e58449d4, type: 3}
+  averagedFormula: {fileID: 2800000, guid: 91799b1aa368c764889688e973a61070, type: 3}
+  velocityFormula: {fileID: 2800000, guid: 2540e12d11d1cc64e8d4b7aa1efc05a3, type: 3}
+  shareHalfFormula: {fileID: 2800000, guid: df4faf88edab9cd4faff0748910214ab, type: 3}
+  shareOneFormula: {fileID: 2800000, guid: 94402e7dee8732a428c7d169b7e76e15, type: 3}
   loop: 1
 --- !u!4 &593691964
 Transform:
@@ -179,6 +184,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1197049907}
   - component: {fileID: 1197049906}
+  - component: {fileID: 1197049908}
   m_Layer: 0
   m_Name: Fill Light
   m_TagString: Untagged
@@ -266,6 +272,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1197049908
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1197049905}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1851649515
 GameObject:
   m_ObjectHideFlags: 0
@@ -276,6 +311,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1851649517}
   - component: {fileID: 1851649516}
+  - component: {fileID: 1851649518}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -363,6 +399,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1851649518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1851649515}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &2108858763
 GameObject:
   m_ObjectHideFlags: 0

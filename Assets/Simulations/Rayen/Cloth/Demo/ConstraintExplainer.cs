@@ -30,6 +30,13 @@ namespace GamiX.Sim.Cloth
         public int recordHeight = 1080;
         public int recordFps = 30;
 
+        [Header("Formulas (rendered math, Demo/Formulas)")]
+        public Texture2D summedFormula;
+        public Texture2D averagedFormula;
+        public Texture2D velocityFormula;
+        public Texture2D shareHalfFormula;
+        public Texture2D shareOneFormula;
+
         [Header("Playback")]
         public bool loop = true;
 
@@ -56,7 +63,8 @@ namespace GamiX.Sim.Cloth
         private Image fadeOverlay;
         private readonly List<LineRenderer> lines = new List<LineRenderer>();
         private readonly List<Text> texts = new List<Text>();
-        private int linesUsed, textsUsed;
+        private readonly List<RawImage> images = new List<RawImage>();
+        private int linesUsed, textsUsed, imagesUsed;
 
         private float time;
         private int part = -1;
@@ -222,6 +230,7 @@ namespace GamiX.Sim.Cloth
 
             linesUsed = 0;
             textsUsed = 0;
+            imagesUsed = 0;
             switch (part)
             {
                 case 0: DrawDistance(time); break;
@@ -238,6 +247,7 @@ namespace GamiX.Sim.Cloth
 
             for (int i = linesUsed; i < lines.Count; i++) lines[i].enabled = false;
             for (int i = textsUsed; i < texts.Count; i++) texts[i].enabled = false;
+            for (int i = imagesUsed; i < images.Count; i++) images[i].enabled = false;
         }
 
         // ================================================================ part 1
@@ -277,18 +287,24 @@ namespace GamiX.Sim.Cloth
             Label($"C = |x<size=30>i</size> − x<size=30>j</size>| − L = {length:0.00} − 2.60 = <b>{Mathf.Max(0f, error):0.00}</b>   {state}",
                 new Vector2(0.5f, 0.20f), 40, Ink, TextAnchor.MiddleCenter);
             if (t > 2.4f)
-                Label("Each particle moves by its share  w<size=26>i</size> / (w<size=26>i</size> + w<size=26>j</size>) = ½  of C, along the link.",
-                    new Vector2(0.5f, 0.12f), 32, WithAlpha(Soft, Ease(2.4f, 2.9f, t)), TextAnchor.MiddleCenter);
+            {
+                float a = Ease(2.4f, 2.9f, t);
+                Label("Each particle moves along the link by its share of C:", new Vector2(0.59f, 0.115f), 32, WithAlpha(Soft, a), TextAnchor.MiddleRight);
+                Formula(shareHalfFormula, new Vector2(0.60f, 0.115f), 0f, a);
+            }
             if (t > 6.4f)
-                Label("Positions are moved, not forces. Velocity comes afterwards: v = (x* − x) / Δt.",
-                    new Vector2(0.5f, 0.70f), 32, WithAlpha(Ink, Ease(6.4f, 6.9f, t)), TextAnchor.MiddleCenter);
+            {
+                float a = Ease(6.4f, 6.9f, t);
+                Label("Constraints move positions, not forces. The velocity comes afterwards:", new Vector2(0.66f, 0.70f), 32, WithAlpha(Ink, a), TextAnchor.MiddleRight);
+                Formula(velocityFormula, new Vector2(0.67f, 0.70f), 0f, a);
+            }
         }
 
         // ================================================================ part 2
 
         private void DrawPinned(float t)
         {
-            Title("2 · A pinned particle: w = 0", "Inverse mass w = 1 / m. A pinned particle has infinite mass.");
+            Title("2 · A pinned particle: w = 0", "Inverse mass w = 1 / m. A pinned particle has infinite mass, so w = 0.");
             Vector3 xi0 = pinnedFrames[0][0], xj = pinnedFrames[0][1];
             Vector3 di = pinnedFrames[1][0] - xi0;
 
@@ -318,8 +334,12 @@ namespace GamiX.Sim.Cloth
             string state = error > 1e-3f ? "<color=#B02A2A>too long</color>" : "<color=#2E8B57>rule satisfied ✓</color>";
             Label($"C = <b>{Mathf.Max(0f, error):0.00}</b>   {state}", new Vector2(0.5f, 0.20f), 40, Ink, TextAnchor.MiddleCenter);
             if (t > 2.4f)
-                Label("Share of i:  w<size=26>i</size> / (w<size=26>i</size> + 0) = 1   →   i takes the whole correction, j never moves.",
-                    new Vector2(0.5f, 0.12f), 32, WithAlpha(Soft, Ease(2.4f, 2.9f, t)), TextAnchor.MiddleCenter);
+            {
+                float a = Ease(2.4f, 2.9f, t);
+                Label("Share of i:", new Vector2(0.36f, 0.115f), 32, WithAlpha(Soft, a), TextAnchor.MiddleRight);
+                Formula(shareOneFormula, new Vector2(0.37f, 0.115f), 0f, a);
+                Label("→   i takes the whole correction, j never moves.", new Vector2(0.475f, 0.115f), 32, WithAlpha(Soft, a), TextAnchor.MiddleLeft);
+            }
         }
 
         // ================================================================ part 3
@@ -335,8 +355,10 @@ namespace GamiX.Sim.Cloth
             float arrowAlpha = it < 0 ? 0f : 1f - Ease(1.4f, 1.7f, local);
             int from = Mathf.Max(0, it);
 
-            Label("<b>Summed</b>   x* += ΣΔx", new Vector2(0.06f, 0.735f), 34, Red, TextAnchor.MiddleLeft);
-            Label("<b>Our solver</b>   x* += ω/n · ΣΔx", new Vector2(0.06f, 0.395f), 34, Teal, TextAnchor.MiddleLeft);
+            Label("<b>Summed</b>", new Vector2(0.06f, 0.775f), 34, Red, TextAnchor.MiddleLeft);
+            Formula(summedFormula, new Vector2(0.06f, 0.705f), 0f, 1f);
+            Label("<b>Our solver</b> (eq. 13)", new Vector2(0.06f, 0.435f), 34, Teal, TextAnchor.MiddleLeft);
+            Formula(averagedFormula, new Vector2(0.06f, 0.36f), 0f, 1f);
 
             Vector3 summedFrom = summedPositions[from], summedTo = summedPositions[Mathf.Min(from + 1, TwoRuleIterations)];
             Vector3 avgFrom = averagedFrames[from][0], avgTo = averagedFrames[Mathf.Min(from + 1, TwoRuleIterations)][0];
@@ -552,6 +574,31 @@ namespace GamiX.Sim.Cloth
             rt.anchorMin = rt.anchorMax = viewport;
             rt.pivot = Pivot(anchor);
             rt.anchoredPosition = Vector2.zero;
+        }
+
+        /// <summary>Rendered formula image, left edge at the viewport point. Height in reference pixels (1080 high); 0 = the image's own
+        /// pixel size (the PNGs are rendered at the size they are shown, so they stay sharp).</summary>
+        private void Formula(Texture2D tex, Vector2 viewport, float height, float alpha)
+        {
+            if (tex == null) return;
+            if (imagesUsed == images.Count)
+            {
+                var go = new GameObject("Formula", typeof(RectTransform));
+                go.transform.SetParent(canvas.transform, false);
+                var ri = go.AddComponent<RawImage>();
+                ri.raycastTarget = false;
+                images.Add(ri);
+            }
+            RawImage img = images[imagesUsed++];
+            img.enabled = true;
+            img.texture = tex;
+            img.color = new Color(1f, 1f, 1f, alpha);
+            RectTransform rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = viewport;
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            if (height <= 0f) height = tex.height;
+            rt.sizeDelta = new Vector2(height * tex.width / tex.height, height);
         }
 
         private static Vector2 Pivot(TextAnchor a)
