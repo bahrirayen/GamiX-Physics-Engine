@@ -26,6 +26,12 @@ namespace GamiX.Sim.Cloth
         public bool showText = true;
         [Tooltip("Show the list of controls (K).")]
         public bool showControls;
+        [Tooltip("Show the flag stretch graph (Jacobi / Gauss-Seidel comparison) in the settings panel.")]
+        public bool showStretchGraph;
+        [Tooltip("Driven by a script (ClothDemoDirector): keyboard and mouse are ignored.")]
+        public bool scripted;
+        [Tooltip("Settings row to highlight (its label), used when a script changes that value.")]
+        public string highlight;
 
         private UnifiedWorld world;
         private ClothAerodynamics aero;
@@ -163,7 +169,7 @@ namespace GamiX.Sim.Cloth
 
         private void Update()
         {
-            Keyboard kb = Keyboard.current;
+            Keyboard kb = scripted ? null : Keyboard.current;
             if (kb != null)
             {
                 if (Pressed(kb, "j")) world.parameters.gaussSeidelDistance = !world.parameters.gaussSeidelDistance;
@@ -191,7 +197,12 @@ namespace GamiX.Sim.Cloth
             // Clicking on the settings panel must not grab or cut the cloth behind it. The state only changes
             // while the button is up, so a drag started in the scene keeps working over the panel.
             Mouse mouse = Mouse.current;
-            if (mouse != null && !mouse.leftButton.isPressed)
+            if (scripted)
+            {
+                if (grabber != null) grabber.enabled = false;
+                if (cutter != null) cutter.enabled = false;
+            }
+            else if (mouse != null && !mouse.leftButton.isPressed)
             {
                 Vector2 mp = mouse.position.ReadValue();
                 bool overPanel = showText && settingsScreenRect.Contains(new Vector2(mp.x, Screen.height - mp.y));
@@ -205,6 +216,34 @@ namespace GamiX.Sim.Cloth
                 smoothFps = Mathf.Lerp(smoothFps, 1f / Mathf.Max(1e-4f, Time.unscaledDeltaTime), 0.05f);
                 SampleLiveValues();
             }
+        }
+
+        // ================================================================ API for scripted demos
+
+        public UnifiedWorld World => world;
+        public ClothAerodynamics Aerodynamics => aero;
+        public bool ParticleView => particleView;
+        public float WindSpeed { get => windSpeed; set => windSpeed = value; }
+        public float WindAngle { get => windAngle; set => windAngle = value; }
+        public float TearStrength { get => tearStrength; set => SetTearStrength(value); }
+
+        /// <summary>
+        /// Suspends tearing without changing the setting shown in the panel (a scripted demo plays with extreme
+        /// values first and rips the curtain later).
+        /// </summary>
+        public void HoldTears(bool hold)
+        {
+            foreach (ParticleCloth c in new[] { curtain, sheet })
+                if (c != null && c.Tearing != null) c.Tearing.tearRatio = hold ? 1000f : tearStrength;
+        }
+        public static int ShotCount => Shots.Length;
+
+        public void GetShot(int i, out Vector3 target, out float distance, out float yaw, out float pitch)
+        {
+            target = Shots[i].target;
+            distance = Shots[i].distance;
+            yaw = Shots[i].yaw;
+            pitch = Shots[i].pitch;
         }
 
         /// <summary>
@@ -430,7 +469,7 @@ namespace GamiX.Sim.Cloth
         /// <summary>The settings panel: sliders and buttons that change the simulation while it runs.</summary>
         private Rect DrawSettings(float screenWidth, Matrix4x4 baseMatrix)
         {
-            var r = new Rect(screenWidth - 20 - 420, 20, 420, 742);
+            var r = new Rect(screenWidth - 20 - 420, 20, 420, showStretchGraph ? 742 : 662);
             Box(r);
             SolverParams p = world.parameters;
             float x = r.x + 20, y = r.y + 14, right = r.xMax - 20;
@@ -483,12 +522,17 @@ namespace GamiX.Sim.Cloth
             GUI.Label(new Rect(x, y, 200, 26), "Flag stretch", textStyle);
             GUI.Label(new Rect(right - 100, y, 100, 26), $"{stretchNow:F1} %", numberStyle);
             y += 30;
-            DrawStretchGraph(new Rect(x, y, right - x, 54));
-            y += 54 + 26;
+            if (showStretchGraph)
+            {
+                DrawStretchGraph(new Rect(x, y, right - x, 54));
+                y += 54 + 26;
+            }
             GUI.Label(new Rect(x, y, right - x, 24), $"Torn <b>{tornEdges}</b> edges   ·   split <b>{splitVertices}</b> vertices", textStyle);
             y += 26;
+            // While recording, the frame rate is the recorder's, not the simulation's: show only the solver time.
+            string fps = scripted ? "" : $"   ·   <b>{smoothFps:F0}</b> FPS";
             GUI.Label(new Rect(x, y, right - x, 24),
-                      $"<b>{world.Solver.ActiveCount:N0}</b> particles   ·   <b>{smoothMs:F1}</b> ms   ·   <b>{smoothFps:F0}</b> FPS", textStyle);
+                      $"<b>{world.Solver.ActiveCount:N0}</b> particles   ·   solver <b>{smoothMs:F1}</b> ms{fps}", textStyle);
             y += 28;
             string status = (cutter != null && cutter.Cutting ? "<color=#c8ff00><b>CUTTING</b></color>   " : "") +
                             (world.paused ? "<color=#ff8c33><b>PAUSED</b></color>   " : "");
@@ -499,6 +543,8 @@ namespace GamiX.Sim.Cloth
         /// <summary>One settings row: label, slider and value on the same line.</summary>
         private float Slider(float x, float right, ref float y, string label, float value, float min, float max, string shown)
         {
+            if (!string.IsNullOrEmpty(highlight) && label.StartsWith(highlight))
+                Fill(new Rect(x - 10, y - 3, right - x + 20, 32), new Color(Accent.r, Accent.g, Accent.b, 0.22f));
             GUI.Label(new Rect(x, y, 130, 28), label, textStyle);
             float v = GUI.HorizontalSlider(new Rect(x + 132, y + 9, right - x - 132 - 92, 18), value, min, max);
             GUI.Label(new Rect(right - 88, y, 88, 28), shown, numberStyle);
