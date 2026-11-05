@@ -5,15 +5,18 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/GamiXPhysics/Demos/Scenes/01_RigidBodies.unity
     guid: 860c4fd73487b704e8fa9619c0c02b69
-  - enabled: 1
+  - enabled: 0
     path: Assets/GamiXPhysics/Demos/Scenes/02_BroadPhase.unity
     guid: b40d512d29e40584b90909c0cd1a630b
-  - enabled: 1
+  - enabled: 0
     path: Assets/GamiXPhysics/Demos/Scenes/03_MassSpring.unity
     guid: 032dbc15b3cd570448ca06f5d4890a03
+  - enabled: 1
+    path: Assets/SimulationPackages/Ropes/Scenes/09_Ropes.unity
+    guid: cb2413630170bfb4fa8da7b36baee9da
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
