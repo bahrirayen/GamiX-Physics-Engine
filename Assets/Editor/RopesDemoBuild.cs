@@ -11,7 +11,7 @@ public static class RopesDemoBuild
         string output = Path.GetFullPath("Builds/RopesDemo/GamiX Ropes Demo.exe");
         var options = new BuildPlayerOptions
         {
-            scenes = new[] { "Assets/SimulationPackages/Ropes/Scenes/09_Ropes.unity" },
+            scenes = new[] { "Assets/Simulations/Oubay/Ropes/Scenes/09_Ropes.unity" },
             locationPathName = output,
             target = BuildTarget.StandaloneWindows64,
             options = BuildOptions.None
